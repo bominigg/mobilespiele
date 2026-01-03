@@ -1,0 +1,47 @@
+# Mobile Spiele - Auto Preis Raten
+
+Ein Spiel zum Schätzen von Autopreisen mit Daten von mobile.de
+
+## Installation
+
+### Lokale Entwicklung
+
+```bash
+npm install
+npm start
+```
+
+Server läuft auf `http://localhost:3000`
+
+### Deployment auf Render
+
+1. Erstelle ein neues Web Service auf Render.com
+2. Verbinde dein GitHub Repository
+3. Einstellungen:
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Environment**: Node
+
+## Struktur
+
+```
+mobile-spiele/
+├── server.js          # Backend Server mit Puppeteer
+├── package.json       # Dependencies
+├── public/
+│   └── index.html     # Frontend (Single Page App)
+└── README.md
+```
+
+## Features
+
+- ✅ Auto-Daten von mobile.de scrapen
+- ✅ Admin-Panel mit Passwort (1337)
+- ✅ Multi-Link Import
+- ✅ LocalStorage für gespeicherte Autos
+- ✅ Dynamische Toleranz-Regeln
+- ✅ Punktesystem
+
+## Admin-Zugang
+
+Passwort: `1337`
