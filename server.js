@@ -1,216 +1,203 @@
 const express = require('express');
+const puppeteer = require('puppeteer');
 const cors = require('cors');
-const axios = require('axios');
-const cheerio = require('cheerio');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
-// Health Check
-app.get('/', (req, res) => {
-  res.json({ status: 'Server läuft', version: '1.0.0' });
-});
-
-// Scrape Car Data from Mobile.de
+// Scrape a single car from mobile.de
 app.post('/api/scrape', async (req, res) => {
+  const { url } = req.body;
+  
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  let browser;
   try {
-    const { url } = req.body;
-
-    if (!url || !url.includes('mobile.de')) {
-      return res.status(400).json({ error: 'Ungültige Mobile.de URL' });
-    }
-
-    // Fetch the page
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
     });
 
-    const $ = cheerio.load(response.data);
-
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    
+    // Wait a bit for dynamic content
+    await page.waitForTimeout(2000);
+    
     // Extract car data
-    const carData = {
-      modell: '',
-      motor: '',
-      ps: 0,
-      laufleistung: 0,
-      baujahr: 0,
-      preis: 0,
-      bilder: []
-    };
+    const carData = await page.evaluate(() => {
+      // Helper function to extract text
+      const getText = (selector) => {
+        const el = document.querySelector(selector);
+        return el ? el.textContent.trim() : '';
+      };
 
-    // Titel/Modell
-    carData.modell = $('h1[data-testid="ad-title"]').text().trim() || 
-                     $('.h2.u-text-bold').first().text().trim() ||
-                     $('h1').first().text().trim();
+      // Helper function to extract number from text
+      const extractNumber = (text) => {
+        const match = text.replace(/\./g, '').match(/\d+/);
+        return match ? parseInt(match[0]) : 0;
+      };
 
-    // Preis
-    const preisText = $('[data-testid="prime-price"]').text().trim() ||
-                      $('.h3.u-text-bold').first().text().trim();
-    carData.preis = parseInt(preisText.replace(/[^\d]/g, '')) || 0;
+      // Extract model/title
+      const modell = getText('h1[class*="Heading"]') || 
+                     getText('h1') || 
+                     getText('[data-testid="ad-title"]') || 
+                     'Unbekanntes Modell';
 
-    // Technische Daten durchgehen
-    $('.techdata--list-item, [data-testid="feature-item"]').each((i, elem) => {
-      const label = $(elem).find('.techdata--label, dt').text().trim().toLowerCase();
-      const value = $(elem).find('.techdata--value, dd').text().trim();
-
-      if (label.includes('leistung') || label.includes('ps')) {
-        const psMatch = value.match(/(\d+)\s*PS/i);
-        if (psMatch) carData.ps = parseInt(psMatch[1]);
-      }
-
-      if (label.includes('kilometerstand') || label.includes('laufleistung')) {
-        const kmMatch = value.replace(/[^\d]/g, '');
-        carData.laufleistung = parseInt(kmMatch) || 0;
-      }
-
-      if (label.includes('erstzulassung') || label.includes('baujahr')) {
-        const yearMatch = value.match(/\d{4}/);
-        if (yearMatch) carData.baujahr = parseInt(yearMatch[0]);
-      }
-
-      if (label.includes('kraftstoff') || label.includes('getriebe')) {
-        if (!carData.motor) {
-          carData.motor = value;
-        } else {
-          carData.motor += ' ' + value;
+      // Extract price - try multiple selectors
+      let preis = 0;
+      const priceSelectors = [
+        '[class*="PriceInfo"]',
+        '[data-testid="prime-price"]',
+        '[class*="price"]',
+        'span[class*="Price"]'
+      ];
+      
+      for (const selector of priceSelectors) {
+        const el = document.querySelector(selector);
+        if (el) {
+          const priceText = el.textContent.trim();
+          preis = extractNumber(priceText);
+          if (preis > 0) break;
         }
       }
-    });
 
-    // Alternative: Daten aus JSON-LD Script
-    $('script[type="application/ld+json"]').each((i, elem) => {
-      try {
-        const jsonData = JSON.parse($(elem).html());
-        
-        if (jsonData['@type'] === 'Car' || jsonData['@type'] === 'Vehicle') {
-          if (!carData.modell && jsonData.name) carData.modell = jsonData.name;
-          if (!carData.baujahr && jsonData.modelDate) {
-            const year = new Date(jsonData.modelDate).getFullYear();
-            if (year > 1900) carData.baujahr = year;
-          }
-          if (!carData.laufleistung && jsonData.mileageFromOdometer) {
-            carData.laufleistung = parseInt(jsonData.mileageFromOdometer.value) || 0;
-          }
-          if (!carData.motor && jsonData.fuelType) {
-            carData.motor = jsonData.fuelType;
-          }
-        }
-
-        if (jsonData.offers && jsonData.offers.price) {
-          if (!carData.preis) {
-            carData.preis = parseInt(jsonData.offers.price) || 0;
-          }
-        }
-      } catch (e) {
-        // JSON parsing failed, continue
+      // Extract technical details
+      const details = {
+        motor: 'N/A',
+        ps: 0,
+        laufleistung: 0,
+        baujahr: 2020
+      };
+      
+      // Try to find all text on the page and extract info
+      const allText = document.body.innerText;
+      
+      // Extract PS (Leistung)
+      const psMatches = allText.match(/(\d+)\s*PS/i);
+      if (psMatches) details.ps = parseInt(psMatches[1]);
+      
+      // Extract KW and convert to PS if PS not found
+      if (details.ps === 0) {
+        const kwMatches = allText.match(/(\d+)\s*kW/i);
+        if (kwMatches) details.ps = Math.round(parseInt(kwMatches[1]) * 1.36);
       }
-    });
+      
+      // Extract Kilometerstand
+      const kmMatches = allText.match(/(\d+\.?\d*)\s*km/i);
+      if (kmMatches) {
+        details.laufleistung = parseInt(kmMatches[1].replace('.', ''));
+      }
+      
+      // Extract Baujahr/Erstzulassung
+      const yearMatches = allText.match(/(19|20)\d{2}/);
+      if (yearMatches) {
+        const year = parseInt(yearMatches[0]);
+        if (year >= 1990 && year <= 2025) {
+          details.baujahr = year;
+        }
+      }
+      
+      // Extract Kraftstoff
+      const fuelTypes = ['Benzin', 'Diesel', 'Elektro', 'Hybrid', 'Autogas', 'Erdgas'];
+      for (const fuel of fuelTypes) {
+        if (allText.includes(fuel)) {
+          details.motor = fuel;
+          break;
+        }
+      }
 
-    // Bilder extrahieren
-    const imageSelectors = [
-      'img[data-testid="ad-image"]',
-      '.gallery-picture__image',
-      '.image-gallery img',
-      'img[src*="vehicle"]'
-    ];
-
-    imageSelectors.forEach(selector => {
-      $(selector).each((i, elem) => {
-        const src = $(elem).attr('src') || $(elem).attr('data-src');
-        if (src && !carData.bilder.includes(src)) {
-          // Filter out small thumbnails and icons
-          if (!src.includes('icon') && !src.includes('logo') && src.startsWith('http')) {
-            carData.bilder.push(src);
-          }
+      // Extract images - try multiple strategies
+      const imageUrls = new Set();
+      
+      // Strategy 1: Find images in gallery
+      const galleryImages = document.querySelectorAll('img[src*="mobile"], img[data-src*="mobile"]');
+      galleryImages.forEach(img => {
+        const src = img.src || img.getAttribute('data-src');
+        if (src && src.includes('mobile.de') && !src.includes('logo') && !src.includes('icon')) {
+          // Convert thumbnail to larger image
+          const largeSrc = src.replace(/\/s\//g, '/l/').replace(/\/(xs|s|m)\//g, '/l/');
+          imageUrls.add(largeSrc);
         }
       });
+      
+      // Strategy 2: Check srcset attributes
+      const srcsetImages = document.querySelectorAll('img[srcset]');
+      srcsetImages.forEach(img => {
+        const srcset = img.getAttribute('srcset');
+        if (srcset && srcset.includes('mobile.de')) {
+          const urls = srcset.split(',').map(s => s.trim().split(' ')[0]);
+          urls.forEach(url => {
+            if (url.includes('mobile.de') && !url.includes('logo') && !url.includes('icon')) {
+              imageUrls.add(url);
+            }
+          });
+        }
+      });
+      
+      // Strategy 3: Look for background images
+      const elementsWithBg = document.querySelectorAll('[style*="background-image"]');
+      elementsWithBg.forEach(el => {
+        const style = el.getAttribute('style');
+        const urlMatch = style.match(/url\(['"]?([^'"]+)['"]?\)/);
+        if (urlMatch && urlMatch[1].includes('mobile.de')) {
+          imageUrls.add(urlMatch[1]);
+        }
+      });
+
+      const bilder = Array.from(imageUrls).slice(0, 10);
+
+      return {
+        modell,
+        motor: details.motor,
+        ps: details.ps,
+        laufleistung: details.laufleistung,
+        baujahr: details.baujahr,
+        preis,
+        bilder: bilder.length > 0 ? bilder : ["data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23334155'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='48' fill='%23cbd5e1' text-anchor='middle' dominant-baseline='middle'%3EKein Bild%3C/text%3E%3C/svg%3E"]
+      };
     });
 
-    // Fallback Bild
-    if (carData.bilder.length === 0) {
-      carData.bilder.push("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600'%3E%3Crect width='800' height='600' fill='%23334155'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='48' fill='%23cbd5e1' text-anchor='middle' dominant-baseline='middle'%3EKein Bild%3C/text%3E%3C/svg%3E");
-    }
+    await browser.close();
 
-    // Limit images to 10
-    carData.bilder = carData.bilder.slice(0, 10);
-
-    // Validation
     if (!carData.preis || carData.preis === 0) {
-      return res.status(400).json({ 
-        error: 'Keine Preisdaten gefunden',
-        debug: carData 
-      });
+      return res.status(400).json({ error: 'Konnte keine Preisdaten extrahieren' });
     }
 
-    if (!carData.modell) {
-      return res.status(400).json({ 
-        error: 'Kein Modell gefunden',
-        debug: carData 
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        id: Date.now() + Math.random(),
-        ...carData,
-        url
-      }
-    });
+    console.log('Scraped car data:', carData);
+    res.json(carData);
 
   } catch (error) {
-    console.error('Scraping error:', error.message);
-    res.status(500).json({ 
-      error: 'Fehler beim Scrapen',
-      message: error.message 
-    });
+    if (browser) await browser.close();
+    console.error('Scraping error:', error);
+    res.status(500).json({ error: 'Fehler beim Scrapen: ' + error.message });
   }
 });
 
-// Batch Import
-app.post('/api/scrape-batch', async (req, res) => {
-  try {
-    const { urls } = req.body;
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
-    if (!Array.isArray(urls) || urls.length === 0) {
-      return res.status(400).json({ error: 'Keine URLs angegeben' });
-    }
-
-    const results = [];
-    const errors = [];
-
-    for (const url of urls) {
-      try {
-        const response = await axios.post(`http://localhost:${PORT}/api/scrape`, { url });
-        results.push(response.data.data);
-        
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        errors.push({ url, error: error.message });
-      }
-    }
-
-    res.json({
-      success: true,
-      imported: results.length,
-      failed: errors.length,
-      data: results,
-      errors: errors
-    });
-
-  } catch (error) {
-    console.error('Batch import error:', error);
-    res.status(500).json({ error: 'Batch Import Fehler' });
-  }
+// Serve index.html for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server läuft auf Port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
