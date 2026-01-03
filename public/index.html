@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Spiele</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(to bottom right, #3b82f6, #9333ea);
+      min-height: 100vh;
+    }
+    .container { max-width: 42rem; margin: 0 auto; padding: 1rem; }
+    .card { background: white; border-radius: 1rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden; }
+    .header { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+    .logo { display: flex; gap: 0.5rem; align-items: center; font-size: 1.5rem; font-weight: 700; color: #1f2937; }
+    .score { text-align: right; }
+    .score-label { font-size: 0.875rem; color: #4b5563; }
+    .score-value { font-size: 1.5rem; font-weight: 700; color: #9333ea; }
+    .settings-btn { background: #e5e7eb; padding: 0.5rem; border-radius: 0.5rem; border: none; cursor: pointer; }
+    .settings-btn:hover { background: #d1d5db; }
+    .car-image { width: 100%; height: 16rem; object-fit: cover; background: #e5e7eb; }
+    .content { padding: 1.5rem; }
+    .title { font-size: 1.875rem; font-weight: 700; color: #1f2937; margin-bottom: 1.5rem; }
+    .details { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+    .detail { background: #f9fafb; padding: 1rem; border-radius: 0.75rem; }
+    .detail-label { font-size: 0.875rem; color: #4b5563; margin-bottom: 0.25rem; }
+    .detail-value { font-size: 1.125rem; font-weight: 700; color: #1f2937; }
+    .input-group { display: flex; gap: 0.5rem; }
+    .input { 
+      flex: 1; 
+      padding: 1rem; 
+      font-size: 1.125rem; 
+      border: 2px solid #d1d5db; 
+      border-radius: 0.75rem;
+      outline: none;
+    }
+    .input:focus { border-color: #9333ea; }
+    .btn {
+      padding: 1rem 2rem;
+      background: linear-gradient(to right, #3b82f6, #9333ea);
+      color: white;
+      border: none;
+      border-radius: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-full { width: 100%; }
+    .result-box { 
+      background: linear-gradient(to right, #eff6ff, #faf5ff); 
+      padding: 1.5rem; 
+      border-radius: 0.75rem; 
+      margin-bottom: 1rem;
+    }
+    .result-label { font-size: 0.875rem; color: #4b5563; margin-bottom: 0.5rem; }
+    .result-value { font-size: 1.5rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem; }
+    .result-price { font-size: 1.875rem; font-weight: 700; color: #9333ea; margin-bottom: 1rem; }
+    .result-diff { font-size: 1.125rem; color: #374151; margin-bottom: 0.5rem; }
+    .result-points { font-size: 1.5rem; font-weight: 700; color: #16a34a; margin-top: 0.5rem; }
+    .gameover { text-align: center; padding: 2rem; }
+    .trophy { width: 6rem; height: 6rem; margin: 0 auto 1rem; color: #eab308; }
+    .gameover-title { font-size: 2.25rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem; }
+    .gameover-subtitle { font-size: 1.25rem; color: #dc2626; margin-bottom: 1.5rem; }
+    .gameover-box { background: #f9fafb; padding: 1rem; border-radius: 0.75rem; margin-bottom: 1.5rem; }
+    .gameover-rounds { font-size: 2.25rem; font-weight: 700; color: #2563eb; margin-bottom: 1rem; }
+    .gameover-score { font-size: 3rem; font-weight: 700; color: #9333ea; margin-bottom: 2rem; }
+    .admin-panel { padding: 1.5rem; }
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .admin-title { font-size: 1.875rem; font-weight: 700; color: #1f2937; }
+    .btn-secondary { background: #e5e7eb; color: #374151; }
+    .btn-danger { background: #ef4444; }
+    .btn-danger:hover { background: #dc2626; }
+    .textarea { 
+      width: 100%; 
+      height: 8rem; 
+      padding: 1rem; 
+      border: 2px solid #d1d5db; 
+      border-radius: 0.75rem; 
+      resize: none;
+      font-family: inherit;
+      margin-bottom: 1rem;
+    }
+    .textarea:focus { border-color: #9333ea; outline: none; }
+    .status { padding: 0.75rem; background: #eff6ff; color: #1e40af; border-radius: 0.75rem; margin-top: 1rem; }
+    .car-list { max-height: 24rem; overflow-y: auto; }
+    .car-item { 
+      background: #f9fafb; 
+      padding: 1rem; 
+      border-radius: 0.75rem; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    .car-info { display: flex; gap: 1rem; align-items: center; }
+    .car-thumb { width: 5rem; height: 4rem; object-fit: cover; border-radius: 0.5rem; }
+    .car-name { font-weight: 700; color: #1f2937; }
+    .car-details { font-size: 0.875rem; color: #4b5563; }
+    .empty { text-align: center; padding: 2rem; color: #6b7280; }
+    .login { max-width: 28rem; margin: 10rem auto; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    const API_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:3000' 
+      : 'https://mobilespiele.onrender.com';
+
+    let state = {
+      cars: JSON.parse(localStorage.getItem('cars') || '[]'),
+      currentCar: null,
+      guess: '',
+      showResult: false,
+      score: 0,
+      round: 1,
+      gameOver: false,
+      failed: false,
+      failedCar: null,
+      showAdmin: false,
+      isLoggedIn: false,
+      password: '',
+      linksInput: '',
+      importing: false,
+      importStatus: ''
+    };
+
+    function setState(updates) {
+      state = { ...state, ...updates };
+      render();
+    }
+
+    function selectRandomCar() {
+      if (state.cars.length === 0) return;
+      const randomCar = state.cars[Math.floor(Math.random() * state.cars.length)];
+      setState({ currentCar: randomCar });
+    }
+
+    function saveCars(cars) {
+      localStorage.setItem('cars', JSON.stringify(cars));
+      setState({ cars });
+    }
+
+    async function scrapeCarData(url) {
+      const response = await fetch(`${API_URL}/api/scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+      if (!response.ok) throw new Error('Scraping failed');
+      const data = await response.json();
+      return { id: Date.now() + Math.random(), ...data, url };
+    }
+
+    async function importCars() {
+      setState({ importing: true, importStatus: 'Importiere Autos...' });
+      
+      const links = state.linksInput.split('\n').filter(link => link.trim());
+      const newCars = [];
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (let i = 0; i < links.length; i++) {
+        const link = links[i].trim();
+        if (!link) continue;
+        
+        setState({ importStatus: `Importiere ${i + 1}/${links.length}...` });
+        
+        try {
+          const carData = await scrapeCarData(link);
+          newCars.push(carData);
+          successCount++;
+        } catch (error) {
+          failCount++;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      if (newCars.length > 0) {
+        const allCars = [...state.cars, ...newCars];
+        saveCars(allCars);
+        setState({ linksInput: '', importStatus: `✓ ${successCount} Autos importiert, ${failCount} fehlgeschlagen`, importing: false });
+      } else {
+        setState({ importStatus: '✗ Kein Auto konnte importiert werden', importing: false });
+      }
+    }
+
+    function deleteCar(carId) {
+      const newCars = state.cars.filter(car => car.id !== carId);
+      saveCars(newCars);
+      if (state.currentCar?.id === carId) {
+        selectRandomCar();
+      }
+    }
+
+    function handleGuess() {
+      if (!state.guess || state.guess <= 0) return;
+      
+      const guessNum = parseInt(state.guess);
+      const difference = Math.abs(guessNum - state.currentCar.preis);
+      const preis = state.currentCar.preis;
+      
+      let tolerance = 0;
+      if (preis <= 20000) tolerance = 5000;
+      else if (preis <= 50000) tolerance = 7000;
+      else if (preis <= 100000) tolerance = 10000;
+      else tolerance = preis * 0.10;
+      
+      if (difference > tolerance) {
+        setState({ 
+          failedCar: { ...state.currentCar, guess: guessNum },
+          failed: true,
+          gameOver: true,
+          showResult: true,
+          score: 0
+        });
+        return;
+      }
+      
+      setState({ score: state.score + 1, showResult: true });
+    }
+
+    function nextRound() {
+      setState({ 
+        round: state.round + 1, 
+        guess: '', 
+        showResult: false 
+      });
+      selectRandomCar();
+    }
+
+    function resetGame() {
+      setState({
+        round: 1,
+        score: 0,
+        guess: '',
+        showResult: false,
+        gameOver: false,
+        failed: false,
+        failedCar: null
+      });
+      selectRandomCar();
+    }
+
+    function handleLogin() {
+      if (state.password === '1337') {
+        setState({ isLoggedIn: true, password: '' });
+      } else {
+        alert('Falsches Passwort!');
+      }
+    }
+
+    function render() {
+      var app = document.getElementById('app');
+      
+      if (state.showAdmin && !state.isLoggedIn) {
+        app.innerHTML = '<div class="login card"><div class="content"><h1 class="gameover-title">Admin Login</h1><input type="password" class="input" placeholder="Passwort eingeben..." value="' + state.password + '" onkeypress="if(event.key===\'Enter\') handleLogin()"/><button class="btn btn-full" onclick="handleLogin()" style="margin-top: 1rem;">Einloggen</button><button class="btn btn-full btn-secondary" onclick="setState({showAdmin: false})" style="margin-top: 0.5rem;">Abbrechen</button></div></div>';
+        var input = app.querySelector('input');
+        if (input) input.oninput = function(e) { setState({ password: e.target.value }); };
+        return;
+      }
+
+      if (state.showAdmin && state.isLoggedIn) {
+        var carListHTML = state.cars.length === 0 ? '<div class="empty">Noch keine Autos importiert</div>' : 
+          state.cars.map(function(car) {
+            return '<div class="car-item"><div class="car-info"><img src="' + car.bilder[0] + '" alt="' + car.modell + '" class="car-thumb"><div><div class="car-name">' + car.modell + '</div><div class="car-details">' + car.baujahr + ' • ' + car.laufleistung.toLocaleString('de-DE') + ' km • ' + car.preis.toLocaleString('de-DE') + ' €</div></div></div><button class="btn btn-danger" onclick="deleteCar(' + car.id + ')">Löschen</button></div>';
+          }).join('');
+        
+        app.innerHTML = '<div class="container"><div class="card"><div class="admin-panel"><div class="admin-header"><h1 class="admin-title">Admin Panel</h1><div style="display: flex; gap: 0.5rem;"><button class="btn btn-secondary" onclick="setState({showAdmin: false})">Zurück</button><button class="btn btn-danger" onclick="setState({isLoggedIn: false, showAdmin: false})">Logout</button></div></div><h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem;">Autos importieren</h2><textarea class="textarea" placeholder="Mobile.de Links hier einfügen (ein Link pro Zeile)" ' + (state.importing ? 'disabled' : '') + '>' + state.linksInput + '</textarea><button class="btn btn-full" onclick="importCars()" ' + (state.importing || !state.linksInput.trim() ? 'disabled' : '') + '>' + (state.importing ? 'Importiere...' : 'Autos importieren') + '</button>' + (state.importStatus ? '<div class="status">' + state.importStatus + '</div>' : '') + '<h2 style="font-size: 1.25rem; font-weight: 700; margin: 1.5rem 0 1rem;">Gespeicherte Autos (' + state.cars.length + ')</h2><div class="car-list">' + carListHTML + '</div></div></div></div>';
+        
+        var textarea = app.querySelector('textarea');
+        if (textarea) textarea.oninput = function(e) { setState({ linksInput: e.target.value }); };
+        return;
+      }
+
+      if (state.cars.length === 0) {
+        app.innerHTML = '<div class="container"><div class="card"><div class="gameover"><h1 class="gameover-title">Keine Autos verfügbar</h1><p style="color: #4b5563; margin-bottom: 1.5rem;">Bitte importiere Autos über den Admin-Bereich.</p><button class="btn btn-full" onclick="setState({showAdmin: true})">Admin-Bereich öffnen</button></div></div></div>';
+        return;
+      }
+
+      if (!state.currentCar) {
+        selectRandomCar();
+        return;
+      }
+
+      if (state.gameOver) {
+        var failedHTML = '';
+        if (state.failed && state.failedCar) {
+          failedHTML = '<p class="gameover-subtitle">Zu weit daneben!</p><div class="gameover-box"><p class="car-name">' + state.failedCar.modell + '</p><p class="result-label">Deine Schätzung</p><p class="result-value">' + state.failedCar.guess.toLocaleString('de-DE') + ' €</p><p class="result-label">Tatsächlicher Preis</p><p class="result-price">' + state.failedCar.preis.toLocaleString('de-DE') + ' €</p></div>';
+        }
+        app.innerHTML = '<div class="container"><div class="card"><div class="gameover"><svg class="trophy" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><h1 class="gameover-title">' + (state.failed ? 'Game Over!' : 'Spiel beendet!') + '</h1>' + failedHTML + '<p class="score-label">Erreichte Runden</p><p class="gameover-rounds">' + (state.round - 1) + '</p><p class="score-label">Punkte</p><p class="gameover-score">' + state.score + '</p><button class="btn btn-full" onclick="resetGame()">Nochmal spielen</button></div></div></div>';
+        return;
+      }
+
+      var contentHTML = !state.showResult ? 
+        '<label style="display: block; font-weight: 500; color: #374151; margin-bottom: 0.5rem;">Was kostet dieses Auto?</label><div class="input-group"><input type="number" class="input" placeholder="Preis eingeben..." value="' + state.guess + '"><button class="btn" onclick="handleGuess()" ' + (!state.guess ? 'disabled' : '') + '>OK</button></div>' :
+        '<div class="result-box"><div class="result-label">Deine Schätzung</div><div class="result-value">' + parseInt(state.guess).toLocaleString('de-DE') + ' €</div><div class="result-label">Tatsächlicher Preis</div><div class="result-price">' + state.currentCar.preis.toLocaleString('de-DE') + ' €</div><div style="text-align: center;"><div class="result-diff">Differenz: ' + Math.abs(parseInt(state.guess) - state.currentCar.preis).toLocaleString('de-DE') + ' €</div>' + (!state.gameOver ? '<div class="result-points">+1 Punkt</div>' : '<div style="color: #dc2626; font-size: 1.25rem; font-weight: 700;">Game Over</div>') + '</div></div>' + (!state.gameOver ? '<button class="btn btn-full" onclick="nextRound()">Nächstes Auto →</button>' : '');
+
+      app.innerHTML = '<div class="container"><div class="card header"><div class="logo"><svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2M7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM9 17h6"/></svg>Mobile Spiele</div><div style="display: flex; align-items: center; gap: 1rem;"><div class="score"><div class="score-label">Runde ' + state.round + '</div><div class="score-value">' + state.score + ' Punkte</div></div><button class="settings-btn" onclick="setState({showAdmin: true})">⚙️</button></div></div><div class="card"><img src="' + state.currentCar.bilder[0] + '" alt="' + state.currentCar.modell + '" class="car-image"><div class="content"><h2 class="title">' + state.currentCar.modell + '</h2><div class="details"><div class="detail"><div class="detail-label">Motor</div><div class="detail-value">' + state.currentCar.motor + '</div></div><div class="detail"><div class="detail-label">Leistung</div><div class="detail-value">' + state.currentCar.ps + ' PS</div></div><div class="detail"><div class="detail-label">Laufleistung</div><div class="detail-value">' + state.currentCar.laufleistung.toLocaleString('de-DE') + ' km</div></div><div class="detail"><div class="detail-label">Baujahr</div><div class="detail-value">' + state.currentCar.baujahr + '</div></div></div>' + contentHTML + '</div></div></div>';
+
+      var input = app.querySelector('input[type="number"]');
+      if (input) input.oninput = function(e) { setState({ guess: e.target.value }); };
+    }
+
+    if (state.cars.length > 0) selectRandomCar();
+    render();
+  </script>
+</body>
+</html>
